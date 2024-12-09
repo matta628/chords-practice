@@ -3,7 +3,7 @@
     "private": false,
     "version": "0.0.0",
     "type": "module",
-    "homepage": "https://matta628.github.io/chords-practice",
+    "homepage": "https://matta628.github.io/chords-practice/",
     "scripts": {
         "dev": "vite",
         "build": "vite build",
