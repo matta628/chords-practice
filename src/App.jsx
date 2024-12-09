@@ -12,99 +12,71 @@ import {
 import Grid from '@mui/material/Grid2';
 import MenuIcon from '@mui/icons-material/Menu';
 import './App.css';
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import MusicSlider from './components/MusicSlider';
 import Chord from '@tombatossals/react-chords/lib/Chord';
+import guitar from './assets/guitar.json';
 
 function App() {
     const notes = useMemo(() => {
-        /*
-        A
-        E
-        F
-        F#
-        G
-        G#
-
-        A#
-        B
-        C
-        C#
-        D
-        D#
-        */
         return [
             'E',
             'A#',
-
             'F',
             'B',
-
             'F#',
             'C',
-
             'G',
             'C#',
-
             'G#',
             'D',
-
             'A',
             'D#',
         ];
     }, []);
 
-    const generateChords = useCallback(() => {
-        const rawChords = [];
-        for (let i = 0; i < notes.length; i++) {
-            const note = notes[i];
-            rawChords.push(note + 'major');
-            rawChords.push(note + 'minor');
-            rawChords.push(note + '7');
-            rawChords.push(note + 'maj7');
-            rawChords.push(note + 'm7');
-        }
-        // rawChords.push('G6');
-        // rawChords.push('Gsus4');
-        // rawChords.push('Dsus2');
-        // rawChords.push('Cadd9');
-        // rawChords.push('Asus4');
-        // rawChords.push('Em9/A');
-        // rawChords.push('Em9');
-        // rawChords.push('Esus4');
-        return rawChords;
-    }, [notes]);
-
     const [chordsMap, setChordsMap] = useState(() => {
-        const chords = generateChords();
         const chordsDict = {};
-        chords.forEach((chord) => {
-            // chordsDict[chord] = true;
-            chordsDict[chord] = {};
-            chordsDict[chord].selected = true;
+        notes.forEach((note) => {
+            ['major', 'minor', '7', 'maj7', 'm7'].forEach((suffix) => {
+                if (Array.isArray(guitar.chords[note])) {
+                    const chordInfo = guitar.chords[note].filter(
+                        (chordFlavor) => chordFlavor.suffix === suffix
+                    );
+                    if (chordInfo.length > 0) {
+                        const fullName = note + suffix;
+                        const label =
+                            suffix === 'major'
+                                ? note
+                                : suffix === 'minor'
+                                ? note + 'm'
+                                : fullName;
+
+                        const firstPosition = chordInfo[0].positions[0];
+                        chordsDict[fullName] = {
+                            isSelected: true,
+                            label: label,
+                            position: firstPosition,
+                            suffix: suffix,
+                        };
+                    }
+                }
+            });
         });
         return chordsDict;
-    }, [generateChords]);
+    }, [notes]);
 
     const [open, setOpen] = useState(false);
-    const [bpm, setBpm] = useState(60);
-    const [reps, setReps] = useState(4);
+    const [bpm, setBpm] = useState(120);
+    const [reps, setReps] = useState(8);
     const msPerChord = 60000.0 / bpm;
-    const [a, setA] = useState('C');
-    const [b, setB] = useState('G');
-    const [prevChord, setPrevChord] = useState('');
-    const [currentChord, setCurrentChord] = useState('');
-    const [nextChord, setNextChord] = useState('');
+    const [a, setA] = useState(chordsMap['Cmajor']);
+    const [b, setB] = useState(chordsMap['Gmajor']);
+    const [prevChord, setPrevChord] = useState(chordsMap['Emajor']);
+    const [currentChord, setCurrentChord] = useState(chordsMap['Amajor']);
+    const [nextChord, setNextChord] = useState(chordsMap['Dmajor']);
     const [beatNo, setBeatNo] = useState(0);
     const [patternIdx, setPatternIdx] = useState(1);
-    const [underline, setUnderline] = useState(false);
-
-    const exChord = {
-        frets: [1, 3, 3, 2, 1, 1],
-        fingers: [1, 3, 4, 2, 1, 1],
-        barres: [1],
-        capo: false,
-    };
 
     const instrument = {
         strings: 6,
@@ -122,7 +94,7 @@ function App() {
             if (beatNo == 0) {
                 const chordsEntries = Object.entries(chordsMap);
                 const selectedChords = chordsEntries
-                    .filter(([, isSelected]) => isSelected)
+                    .filter(([, chordObj]) => chordObj.isSelected)
                     .map(([chord]) => chord);
                 const newChord =
                     selectedChords[
@@ -131,20 +103,13 @@ function App() {
 
                 setPatternIdx((patternIdx + 1) % 4);
                 if (patternIdx == 0) {
-                    setA(newChord);
+                    setA(chordsMap[newChord]);
                     setB(a);
                 }
                 setNextChord(patternIdx % 2 == 0 ? b : a);
                 setCurrentChord(nextChord);
                 setPrevChord(currentChord);
             }
-
-            setTimeout(() => {
-                setUnderline(true);
-            }, msPerChord / 2.0);
-            setTimeout(() => {
-                setUnderline(false);
-            }, (3 * msPerChord) / 4.0);
         }, msPerChord);
         return () => {
             clearInterval(intervalId);
@@ -156,7 +121,6 @@ function App() {
         nextChord,
         reps,
         beatNo,
-        underline,
         a,
         b,
         patternIdx,
@@ -169,16 +133,36 @@ function App() {
     const toggleChordSelect = (chord) => {
         setChordsMap({
             ...chordsMap,
-            [chord]: !chordsMap[chord],
+            [chord]: {
+                ...chordsMap[chord],
+                isSelected: !chordsMap[chord].isSelected,
+            },
         });
     };
 
     const assignAllChords = (isSelected) => {
         setChordsMap(() => {
             const newChordsMap = {};
-            Object.keys(chordsMap).forEach(
-                (chord) => (newChordsMap[chord] = isSelected)
-            );
+            Object.keys(chordsMap).forEach((chord) => {
+                newChordsMap[chord] = {
+                    ...chordsMap[chord],
+                    isSelected: isSelected,
+                };
+            });
+            return newChordsMap;
+        });
+    };
+    const selectAllSuffixChords = (suffix) => {
+        setChordsMap(() => {
+            const newChordsMap = {};
+            Object.keys(chordsMap).forEach((chord) => {
+                newChordsMap[chord] = {
+                    ...chordsMap[chord],
+                    isSelected:
+                        chordsMap[chord].isSelected ||
+                        chordsMap[chord].suffix === suffix,
+                };
+            });
             return newChordsMap;
         });
     };
@@ -204,6 +188,22 @@ function App() {
                                 Select Chords
                             </Typography>
                             <Stack direction="row">
+                                {['major', 'minor', '7', 'maj7', 'm7'].map(
+                                    (suffix) => {
+                                        return (
+                                            <Button
+                                                key={suffix}
+                                                onClick={() =>
+                                                    selectAllSuffixChords(
+                                                        suffix
+                                                    )
+                                                }
+                                            >
+                                                {'Select ' + suffix}
+                                            </Button>
+                                        );
+                                    }
+                                )}
                                 <Button onClick={() => assignAllChords(true)}>
                                     Select All
                                 </Button>
@@ -214,21 +214,27 @@ function App() {
                         </Stack>
                         <Grid container spacing={1}>
                             {chordsMap &&
-                                Object.keys(chordsMap).map((chord) => {
+                                Object.keys(chordsMap).map((chordKey) => {
+                                    const chord = chordsMap[chordKey];
+
                                     return (
-                                        <Grid key={chord} size={12 / 10} item>
+                                        <Grid
+                                            key={chord.label}
+                                            size={12 / 10}
+                                            item
+                                        >
                                             <FormControlLabel
-                                                label={chord}
+                                                label={chord.label}
                                                 style={{ color: '#f7e4d2' }}
                                                 control={
                                                     <Checkbox
                                                         onChange={() =>
                                                             toggleChordSelect(
-                                                                chord
+                                                                chordKey
                                                             )
                                                         }
                                                         checked={
-                                                            chordsMap[chord]
+                                                            chord.isSelected
                                                         }
                                                     />
                                                 }
@@ -251,8 +257,10 @@ function App() {
                 border="1px solid white"
                 height="50vh"
                 display="flex"
+                flexDirection="column"
                 justifyContent="center"
                 alignItems="center"
+                gap="3vh"
             >
                 <Stack
                     direction="row"
@@ -260,22 +268,33 @@ function App() {
                     width="100%"
                 >
                     <Stack alignItems="center" justifyContent="center">
-                        <Typography variant="h5">{prevChord}</Typography>
+                        <Typography variant="h5">{prevChord.label}</Typography>
+                        <Chord
+                            chord={prevChord.position}
+                            instrument={instrument}
+                        />
                     </Stack>
                     <Stack alignItems="center" justifyContent="center">
-                        <Typography
-                            variant="h4"
-                            sx={{
-                                textDecoration: underline ? 'underline' : '',
-                            }}
-                        >
-                            {currentChord}
+                        <Typography variant="h4">
+                            {currentChord.label}
                         </Typography>
-                        <Chord chord={exChord} instrument={instrument} />
+                        <Chord
+                            chord={currentChord.position}
+                            instrument={instrument}
+                        />
                     </Stack>
                     <Stack alignItems="center" justifyContent="center">
-                        <Typography variant="h5">{nextChord}</Typography>
+                        <Typography variant="h5">{nextChord.label}</Typography>
+                        <Chord
+                            chord={nextChord.position}
+                            instrument={instrument}
+                        />
                     </Stack>
+                </Stack>
+                <Stack direction="row">
+                    <Typography variant="h4">
+                        {((beatNo + reps - 1) % reps) + 1}
+                    </Typography>
                 </Stack>
             </Box>
             <Stack
